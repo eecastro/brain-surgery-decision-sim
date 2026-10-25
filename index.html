@@ -124,7 +124,41 @@
   }
   .err { color: var(--damage); font-weight: 700; }
   section + section { margin-top: 2.5rem; }
-  .reset-row { margin-top: 3rem; font-size: 0.85rem; }
+  .finish { border-top: 2px solid var(--line); padding-top: 1.5rem; }
+  .finish label { display: block; font-weight: 700; margin-bottom: 0.4rem; }
+  .finish input { max-width: 22rem; }
+  .print-only { display: none; }
+
+  /* ---------- Save as PDF (print) ---------- */
+  @media print {
+    :root {
+      color-scheme: light;
+      --paper: #ffffff; --sheet: #ffffff; --ink: #000000; --muted: #4a5660; --line: #c4cdd3;
+      --scrub: #26706a; --scrub-ink: #ffffff; --damage: #b0281c; --temp: #9c6510; --recovered: #23786e;
+    }
+    @page { margin: 14mm; }
+    html, body { background: #fff; font-size: 11pt; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .band, .toggle, .actions, .finish, .no-print { display: none !important; }
+    .print-only { display: block; }
+    main { padding: 0; }
+    .wrap { max-width: none; padding: 0; }
+    h1 { font-size: 18pt; }
+    h2 { font-size: 13pt; break-after: avoid; }
+    section + section { margin-top: 1.25rem; }
+    .film { margin: 0; break-inside: avoid; box-shadow: none; }
+    .film svg { max-height: 85mm; width: auto; margin: 0 auto; }
+    .findings > li, .weigh, .code-card, ol.ranking, .print-head { break-inside: avoid; }
+    .code-card { margin: 1.25rem 0; }
+    .print-head { border-bottom: 2px solid #000; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .print-head dl { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 1rem; margin: 0.4rem 0 0; }
+    .print-head dt { font-weight: 700; }
+    .print-head dd { margin: 0; }
+    .print-caption { font-weight: 700; margin: 0.6rem 0 0.4rem; }
+    ol.ranking { columns: 2; column-gap: 2rem; }
+    ol.ranking li { break-inside: avoid; padding: 0.25rem 0; grid-template-columns: 2.9rem 1fr; }
+    .credits { padding: 0.75rem 0 0; break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -425,18 +459,34 @@
 
       app.innerHTML = `
         <section class="screen">
-          <h1>After surgery</h1>
+          <div class="print-only print-head">
+            <p style="margin:0">${esc(C.title)}</p>
+            <h1 style="margin:0">My surgery results</h1>
+            <dl>
+              <dt>Name</dt><dd>${esc(S.name || "")}&nbsp;</dd>
+              <dt>Date</dt><dd>${esc(new Date(S.roll.at || Date.now()).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</dd>
+              <dt>Route</dt><dd>${esc(corr.name)}</dd>
+              <dt>Result code</dt><dd style="font-family:var(--mono)">${esc(code)}</dd>
+            </dl>
+          </div>
+          <h1 class="no-print">After surgery</h1>
           <p class="headline">${headline}</p>
           <div class="toggle" role="group" aria-label="When">
             <button data-phase="post" aria-pressed="${phase === "post"}">Right after surgery</button>
             <button data-phase="later" aria-pressed="${phase === "later"}">Three months later</button>
           </div>
+          <p class="print-only print-caption">${phase === "later" ? "Three months later" : "Right after surgery"}</p>
           <div class="film">
             <div class="film-meta"><span>Left hemisphere, seen from the left side</span><span>Dashed shapes lie deep inside</span></div>
             ${mapSVG(corr, outcomes, phase, "me")}
             ${legendHTML()}
           </div>
           <ol class="findings">${corr.risks.map((r, i) => findingHTML(r, i, res[i], phase)).join("")}</ol>
+          ${outcomes.includes("T") ? `
+          <div class="print-only">
+            <p class="print-caption">${phase === "later" ? "Right after surgery" : "Three months later"}</p>
+            <div class="film">${mapSVG(corr, outcomes, phase === "later" ? "post" : "later", "other")}${legendHTML()}</div>
+          </div>` : `<p class="print-only muted">Nothing changed over the following three months: none of the damage on this route was temporary.</p>`}
         </section>
 
         <section>
@@ -444,7 +494,7 @@
           <p>${esc(C.tumorReveal)}</p>
         </section>
 
-        <section>
+        <section class="weigh">
           <h2>How your choice weighed against your priorities</h2>
           <p>Each bar adds up every risk on that route, weighted by how highly you ranked the ability at stake. Shorter is safer for what you care about. ${
             best.c.code === corr.code
@@ -454,6 +504,11 @@
             <li class="${x.c.code === corr.code ? "mine" : ""}"><span class="lbl">${esc(x.c.name)}${x.c.code === corr.code ? " (your choice)" : ""}</span>
             <span class="bar"><span style="width:${Math.max(4, (x.v / maxCost) * 100)}%"></span></span></li>`).join("")}</ul>
           <p class="muted small">This compares odds, not outcomes. A sensible choice can still end badly, and a risky one can turn out fine.</p>
+        </section>
+
+        <section class="print-only" style="break-inside: avoid">
+          <h2>My priorities</h2>
+          <ol class="ranking">${S.ranking.map((c) => `<li><span>${esc(abilityByCode[c].name)}</span></li>`).join("")}</ol>
         </section>
 
         <section class="code-card">
@@ -466,6 +521,17 @@
         <section>
           <h2>About this simulation</h2>
           <p>${esc(C.simulationNote)}</p>
+        </section>
+
+        <section class="finish">
+          <h2>Save or start over</h2>
+          <label for="pname">Your name, printed on the PDF</label>
+          <input type="text" id="pname" autocomplete="name" value="${esc(S.name || "")}">
+          <p class="small muted" style="margin-top:0.75rem">Save as PDF opens your browser’s print window. Choose “Save as PDF” as the destination. On a phone, use the share or print option there.</p>
+          <div class="actions" style="margin-top:0.75rem">
+            <button class="btn" data-act="pdf">Save as PDF</button>
+            <button class="btn quiet" data-act="restart">Start over</button>
+          </div>
         </section>`;
 
       app.querySelectorAll("[data-phase]").forEach((b) => b.addEventListener("click", () => {
@@ -473,6 +539,7 @@
         const y = window.scrollY; render(false); window.scrollTo(0, y);
         const t = app.querySelector(`[data-phase="${S.phase}"]`); if (t) t.focus({ preventScroll: true });
       }));
+      document.getElementById("pname").addEventListener("input", (e) => { S.name = e.target.value.slice(0, 80); save(); });
     }
   };
 
@@ -492,6 +559,8 @@
     else if (a === "gate") tryGate();
     else if (a === "toReveal") go("reveal");
     else if (a === "copy") copyCode();
+    else if (a === "pdf") savePDF();
+    else if (a === "restart") startOver();
   });
   document.addEventListener("keydown", (e) => {
     if (S.stage !== "sort" || e.target.matches("input,textarea")) return;
@@ -531,6 +600,25 @@
       if (t < 1) requestAnimationFrame(frame); else { el.style.left = target + "%"; done(); }
     }
     requestAnimationFrame(frame);
+  }
+
+  function savePDF() {
+    // Re-render so the printed header picks up the latest name, then open the print window.
+    const y = window.scrollY; render(false); window.scrollTo(0, y);
+    const original = document.title;
+    const who = (S.name || "").trim();
+    document.title = "Surgery results" + (who ? " - " + who : ""); // suggested PDF file name
+    const restore = () => { document.title = original; window.removeEventListener("afterprint", restore); };
+    window.addEventListener("afterprint", restore);
+    window.print();
+  }
+
+  function startOver() {
+    const ok = window.confirm("Start over? This erases your choices, your surgery result, and your result code on this device. If you need your result, save the PDF or copy the code first.");
+    if (!ok) return;
+    S = freshState();
+    save();
+    render(true);
   }
 
   function copyCode() {
