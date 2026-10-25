@@ -1,0 +1,154 @@
+/*
+  Where Should the Surgeon Go?
+  Copyright (c) 2026 Eric E Castro, Psychology Department, St Ignatius College Prep.
+  Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+
+  style.css — shared by index.html and results.html
+*/
+
+:root {
+  color-scheme: light;
+  --paper: #e9eef1;
+  --sheet: #ffffff;
+  --ink: #18242e;
+  --muted: #56656f;
+  --line: #c9d3d9;
+  --scrub: #26706a;
+  --scrub-ink: #ffffff;
+  --scrub-soft: #d7ebe8;
+  --damage: #c0392b;
+  --temp: #b7791f;
+  --recovered: #2f8f84;
+  --film: #13212b;
+  --film-line: #8fa9b8;
+  --film-faint: #3a5263;
+  --film-text: #dce7ed;
+  --focus: #1b6fd1;
+  --radius-band: 999px;
+  --radius: 10px;
+  --font: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper: #141c22;
+    --sheet: #1c262d;
+    --ink: #e4ecf0;
+    --muted: #9eb0bb;
+    --line: #34444f;
+    --scrub: #4fb3a8;
+    --scrub-ink: #0e1a1f;
+    --scrub-soft: #1f3a38;
+    --damage: #e8604f;
+    --temp: #e0a43c;
+    --recovered: #5cc3b6;
+    --film: #0c151b;
+    --focus: #6aa8f0;
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+h1, h2, h3 { line-height: 1.2; margin: 0 0 0.6em; }
+h1 { font-size: clamp(1.75rem, 5vw, 2.5rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.4rem; }
+h3 { font-size: 1.1rem; }
+p { margin: 0 0 1em; }
+.muted { color: var(--muted); }
+.small { font-size: 0.9rem; }
+
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+
+.wrap { max-width: 44rem; margin: 0 auto; padding: 0 1.25rem; }
+
+/* Wristband header */
+.band {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--paper);
+  padding: calc(0.75rem + env(safe-area-inset-top, 0px)) 0 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.wristband {
+  display: flex; align-items: center; gap: 0.9rem; flex-wrap: nowrap;
+  background: var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-band);
+  padding: 0.35rem 0.5rem 0.35rem 1rem;
+  font-size: 0.85rem;
+}
+.wristband .who { font-weight: 700; white-space: nowrap; }
+.steps { display: flex; gap: 0.15rem; margin: 0 0 0 auto; padding: 0; list-style: none; flex-wrap: nowrap; }
+.steps li {
+  padding: 0.15rem 0.55rem; border-radius: var(--radius-band); color: var(--muted); white-space: nowrap;
+}
+.steps li.done { color: var(--ink); }
+.steps li.now { background: var(--scrub); color: var(--scrub-ink); font-weight: 700; }
+@media (max-width: 720px) {
+  .steps li:not(.now) { display: none; }
+}
+
+main { padding: 2rem 0 4rem; }
+section.screen > * + * { margin-top: 0; }
+
+.lede { font-size: 1.2rem; }
+.note {
+  border-left: 4px solid var(--temp);
+  background: var(--sheet);
+  padding: 0.9rem 1rem;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  margin: 1.5rem 0;
+}
+
+/* Buttons */
+.btn {
+  appearance: none; border: 2px solid var(--scrub); background: var(--scrub); color: var(--scrub-ink);
+  font: inherit; font-weight: 700; padding: 0.75rem 1.25rem; border-radius: var(--radius);
+  cursor: pointer; min-height: 48px;
+}
+.btn:hover { filter: brightness(1.07); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; filter: none; }
+.btn.quiet { background: transparent; color: var(--scrub); }
+.btn.link { border: 0; background: none; color: var(--scrub); padding: 0.5rem 0; min-height: 0; text-decoration: underline; text-underline-offset: 3px; }
+.actions { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-top: 1.75rem; }
+
+input[type="text"], textarea {
+  font: inherit; color: var(--ink); background: var(--sheet);
+  border: 2px solid var(--line); border-radius: var(--radius); padding: 0.65rem 0.8rem; width: 100%;
+}
+input[type="text"]:focus, textarea:focus { border-color: var(--scrub); outline: none; }
+
+.sheet {
+  background: var(--sheet); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem;
+}
+
+.chip {
+  display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 0.1rem 0.55rem;
+  border-radius: var(--radius-band); white-space: nowrap; border: 1.5px solid currentColor;
+}
+.chip.rank { color: var(--muted); }
+.chip.rank.high { color: var(--damage); }
+.chip.often-temp { color: var(--temp); }
+.chip.perm { background: var(--damage); border-color: var(--damage); color: #fff; }
+.chip.temp { background: var(--temp); border-color: var(--temp); color: #1b1300; }
+.chip.recovered { color: var(--recovered); }
+.chip.spared { color: var(--muted); }
+
+.credits {
+  border-top: 1px solid var(--line); padding: 1.25rem 0 2rem; font-size: 0.85rem; color: var(--muted);
+}
+.credits p { margin: 0 0 0.25rem; }
+.credits a { color: inherit; text-underline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

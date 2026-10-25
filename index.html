@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<!--
+  Where Should the Surgeon Go?
+  Copyright (c) 2026 Eric E Castro, Psychology Department, St Ignatius College Prep.
+  Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where Should the Surgeon Go?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* Pairwise choice */
+  .pair-prompt { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.25rem; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  @media (max-width: 520px) { .pair { grid-template-columns: 1fr; } }
+  .pick {
+    appearance: none; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+    background: var(--sheet); border: 2px solid var(--line); border-radius: var(--radius);
+    padding: 1.1rem 1.1rem 1.25rem; min-height: 9rem; display: flex; flex-direction: column; gap: 0.4rem;
+  }
+  .pick:hover { border-color: var(--scrub); }
+  .pick .name { font-size: 1.2rem; font-weight: 700; }
+  .pick .desc { color: var(--muted); font-size: 0.95rem; }
+  .pick .keep { margin-top: auto; padding-top: 0.6rem; color: var(--scrub); font-weight: 700; }
+  .progress { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 1.5rem 0 0.5rem; }
+  .progress > span { display: block; height: 100%; background: var(--scrub); transition: width 0.25s; }
+  .pair-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; font-size: 0.9rem; color: var(--muted); }
+
+  /* Ranking */
+  ol.ranking { list-style: none; padding: 0; margin: 1rem 0; counter-reset: r; }
+  ol.ranking li {
+    counter-increment: r; display: grid; grid-template-columns: 2.4rem 1fr; align-items: baseline;
+    padding: 0.55rem 0; border-bottom: 1px solid var(--line);
+  }
+  ol.ranking li::before { content: "#" counter(r); font-weight: 700; color: var(--muted); }
+  ol.ranking li:nth-child(-n+3)::before { color: var(--scrub); }
+
+  /* Consultation */
+  .corridor { background: var(--sheet); border: 2px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.2rem; margin: 1rem 0; }
+  .corridor.chosen { border-color: var(--scrub); }
+  .corridor h3 { margin-bottom: 0.3rem; }
+  .corridor .approach { color: var(--muted); font-size: 0.95rem; }
+  .risks { list-style: none; padding: 0; margin: 0.75rem 0 1rem; }
+  .risks li {
+    display: grid; grid-template-columns: 3.4rem 1fr auto; gap: 0.6rem; align-items: center;
+    padding: 0.45rem 0; border-top: 1px solid var(--line);
+  }
+  .risks .pct { font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .risks .tags { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+  @media (max-width: 520px) {
+    .risks li { grid-template-columns: 3.4rem 1fr; row-gap: 0.25rem; }
+    .risks .tags { grid-column: 2; justify-content: flex-start; }
+  }
+  .consent { margin-top: 1rem; padding-top: 1rem; border-top: 2px dashed var(--line); }
+  .consent label { display: block; font-weight: 700; margin-bottom: 0.4rem; }
+  .consent input { max-width: 10rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  /* Gate */
+  .gate { text-align: left; }
+  .gate input { max-width: 16rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .gate .err { color: var(--damage); font-weight: 700; min-height: 1.5em; margin-top: 0.5rem; }
+
+  /* Surgery roll */
+  .roll { list-style: none; padding: 0; margin: 1.5rem 0; }
+  .roll li { padding: 0.8rem 0; border-top: 1px solid var(--line); }
+  .roll .row-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: 0.45rem; }
+  .roll .name { font-weight: 700; }
+  .roll .verdict { font-weight: 700; min-width: 6rem; text-align: right; }
+  .roll .verdict.hit { color: var(--damage); }
+  .roll .verdict.miss { color: var(--recovered); }
+  .track { position: relative; height: 28px; border-radius: 6px; background: var(--scrub-soft); overflow: visible; }
+  .track .zone { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--damage) 30%, transparent); border-right: 2px solid var(--damage); border-radius: 6px 0 0 6px; }
+  .track .needle { position: absolute; top: -5px; bottom: -5px; width: 4px; margin-left: -2px; background: var(--ink); border-radius: 2px; left: 0; }
+  .track-scale { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+
+  /* Reveal */
+  .headline { font-size: 1.3rem; }
+  .headline strong { color: var(--damage); }
+  .toggle { display: inline-flex; border: 2px solid var(--scrub); border-radius: var(--radius); overflow: hidden; margin: 0.5rem 0 1rem; }
+  .toggle button { appearance: none; border: 0; background: transparent; color: var(--scrub); font: inherit; font-weight: 700; padding: 0.55rem 0.9rem; cursor: pointer; min-height: 44px; }
+  .toggle button[aria-pressed="true"] { background: var(--scrub); color: var(--scrub-ink); }
+
+  .film {
+    background: var(--film); color: var(--film-text); border-radius: 14px; padding: 1rem 1rem 0.8rem;
+    box-shadow: inset 0 0 0 1px #24394a, inset 0 0 60px rgba(120, 170, 200, 0.08);
+    margin: 0 -0.25rem;
+  }
+  .film svg { display: block; width: 100%; height: auto; }
+  .film-meta { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.8rem; color: var(--film-line); padding: 0 0.25rem 0.4rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.82rem; color: var(--film-text); padding: 0.5rem 0.25rem 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .legend i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
+  .findings { list-style: none; padding: 0; margin: 1.25rem 0; }
+  .findings > li { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.75rem; padding: 1rem 0; border-top: 1px solid var(--line); }
+  .findings .num {
+    width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+    background: var(--film); color: var(--film-text); font-size: 0.95rem;
+  }
+  .findings .title { display: flex; flex-wrap: wrap; gap: 0.4rem 0.6rem; align-items: center; margin-bottom: 0.2rem; }
+  .findings .title b { font-size: 1.05rem; }
+  .findings .structure { font-weight: 700; color: var(--muted); margin-bottom: 0.25rem; }
+  .findings .effect { margin: 0.25rem 0 0; }
+  .vf { display: flex; gap: 0.8rem; align-items: center; margin-top: 0.6rem; font-size: 0.8rem; color: var(--muted); }
+  .vf svg { width: 130px; height: auto; }
+
+  .cost { list-style: none; padding: 0; margin: 1rem 0; }
+  .cost li { display: grid; grid-template-columns: minmax(8rem, 14rem) 1fr; gap: 0.75rem; align-items: center; padding: 0.35rem 0; }
+  .cost .bar { height: 14px; border-radius: 7px; background: var(--line); }
+  .cost .bar > span { display: block; height: 100%; border-radius: 7px; background: var(--muted); }
+  .cost li.mine .bar > span { background: var(--scrub); }
+  .cost li.mine .lbl { font-weight: 700; }
+
+  .code-card { background: var(--sheet); border: 2px solid var(--scrub); border-radius: var(--radius); padding: 1.1rem 1.2rem; margin: 2rem 0; }
+  .code {
+    font-family: var(--mono); font-size: clamp(1rem, 4.2vw, 1.45rem); font-weight: 700; letter-spacing: 0.04em;
+    word-break: break-all; background: var(--paper); border-radius: 8px; padding: 0.7rem 0.85rem; margin: 0.6rem 0;
+    user-select: all;
+  }
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+  @media (max-width: 680px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-grid h3 { font-size: 1rem; margin: 0.6rem 0 0.2rem; }
+  .compare-grid .who-line { font-size: 0.9rem; color: var(--muted); margin: 0 0 0.5rem; }
+  .err { color: var(--damage); font-weight: 700; }
+  section + section { margin-top: 2.5rem; }
+  .reset-row { margin-top: 3rem; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<header class="band">
+  <div class="wrap">
+    <div class="wristband" aria-label="Patient wristband">
+      <span class="who">Patient: you, age 18</span>
+      <ol class="steps" id="steps" aria-label="Progress"></ol>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="app" tabindex="-1"></main>
+<footer class="wrap credits" id="credits"></footer>
+
+<script src="content.js"></script>
+<script src="sim-core.js"></script>
+<script>
+(function () {
+  const { C, abilityByCode, corridorByCode, esc, buildCode, parseCode, secureRandom } = window.SIM;
+  const app = document.getElementById("app");
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- settings from the page link ---------- */
+  const params = new URLSearchParams(location.search);
+  let gateEnabled = !!C.settings.gateEnabled;
+  let gateWord = String(C.settings.gateWord || "").trim().toUpperCase();
+  const gp = params.get("gate");
+  if (gp !== null) {
+    const v = gp.trim();
+    if (/^(off|no|false|0)$/i.test(v)) gateEnabled = false;
+    else if (/^(on|yes|true|1)$/i.test(v) || v === "") gateEnabled = true;
+    else { gateEnabled = true; gateWord = v.toUpperCase(); }
+  }
+  const STORE = C.settings.storageKey + ":" + C.version;
+
+  if (params.get("reset") === "1") {
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    params.delete("reset");
+    const q = params.toString();
+    try { history.replaceState(null, "", location.pathname + (q ? "?" + q : "") + location.hash); } catch (e) {}
+  }
+
+  /* ---------- state ---------- */
+  function freshState() {
+    const order = C.abilities.map((a) => a.code);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(secureRandom() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const flips = Array.from({ length: 80 }, () => secureRandom() < 0.5);
+    return { stage: "intro", order, flips, answers: [], ranking: null, corridor: null, roll: null, phase: "post" };
+  }
+  let S = load() || freshState();
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      return s && s.stage && Array.isArray(s.order) ? s : null;
+    } catch (e) { return null; }
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+  function go(stage) { S.stage = stage; save(); render(true); }
+
+  /* ---------- pairwise smart sorting (binary insertion, replayed from saved answers) ---------- */
+  // answers[i] === true means the first item of the i-th comparison was kept (ranked higher).
+  function runSort(order, answers) {
+    let i = 0;
+    const sorted = [order[0]];
+    for (let k = 1; k < order.length; k++) {
+      const x = order[k];
+      let lo = 0, hi = sorted.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (i >= answers.length) return { done: false, pair: [x, sorted[mid]], asked: i, placed: k };
+        if (answers[i++]) hi = mid; else lo = mid + 1;
+      }
+      sorted.splice(lo, 0, x);
+    }
+    return { done: true, ranking: sorted, asked: i, placed: order.length };
+  }
+
+  /* ---------- steps indicator ---------- */
+  const STEP_NAMES = ["Diagnosis", "Priorities", "Consultation", "Surgery", "Recovery"];
+  const STAGE_STEP = { intro: 0, story: 0, sortIntro: 1, sort: 1, ranked: 1, consult: 2, gate: 3, surgery: 3, reveal: 4 };
+  function renderSteps() {
+    const now = STAGE_STEP[S.stage] || 0;
+    document.getElementById("steps").innerHTML = STEP_NAMES.map((n, i) =>
+      `<li class="${i < now ? "done" : i === now ? "now" : ""}"${i === now ? ' aria-current="step"' : ""}>${i + 1}. ${n}</li>`).join("");
+  }
+
+  function rankOf(code) { return S.ranking ? S.ranking.indexOf(code) + 1 : 0; }
+
+  /* ---------- screens ---------- */
+  function render(moveFocus) {
+    renderSteps();
+    const fn = SCREENS[S.stage] || SCREENS.intro;
+    app.innerHTML = "";
+    fn();
+    if (moveFocus) { window.scrollTo(0, 0); app.focus({ preventScroll: true }); }
+  }
+
+  const SCREENS = {
+    intro() {
+      app.innerHTML = `
+        <section class="screen">
+          <h1>${esc(C.title)}</h1>
+          <p class="lede">${esc(C.subtitle)}</p>
+          <div class="note"><p style="margin:0">${esc(C.contentNote)}</p></div>
+          <p>You will read your diagnosis, tell the surgical team what matters most to you, choose a surgical route, and then find out what happened.</p>
+          <div class="actions"><button class="btn" data-go="story">Begin</button></div>
+        </section>`;
+    },
+
+    story() {
+      app.innerHTML = `
+        <section class="screen">
+          <h1>${esc(C.story.heading)}</h1>
+          ${C.story.paragraphs.map((p) => `<p>${esc(p)}</p>`).join("")}
+          <div class="actions"><button class="btn" data-go="sortIntro">Tell the team what matters to you</button></div>
+        </section>`;
+    },
+
+    sortIntro() {
+      app.innerHTML = `
+        <section class="screen">
+          <h1>What matters most to you?</h1>
+          <p>You will see two abilities at a time. Each time, choose the one you would keep if only one could be protected.</p>
+          <p>It takes about 30 choices. Some will be easy and some will feel impossible. There are no right answers; go with your gut, as a graduating senior with your whole future ahead of you.</p>
+          <p class="muted small">On a keyboard you can press the left and right arrow keys to choose.</p>
+          <div class="actions"><button class="btn" data-go="sort">Start choosing</button></div>
+        </section>`;
+    },
+
+    sort() {
+      const res = runSort(S.order, S.answers);
+      if (res.done) { S.ranking = res.ranking; go("ranked"); return; }
+      const [x, y] = res.pair;
+      const flip = S.flips[res.asked % S.flips.length];
+      const left = flip ? y : x, right = flip ? x : y;
+      const card = (code, side) => {
+        const a = abilityByCode[code];
+        return `<button class="pick" data-keep="${code}" data-side="${side}">
+          <span class="name">${esc(a.name)}</span><span class="desc">${esc(a.desc)}</span><span class="keep">Keep this</span></button>`;
+      };
+      const pct = Math.round((res.placed - 1) / (S.order.length - 1) * 100);
+      app.innerHTML = `
+        <section class="screen">
+          <p class="pair-prompt">${esc(C.pairPrompt)}</p>
+          <div class="pair">${card(left, "L")}${card(right, "R")}</div>
+          <div class="progress" aria-hidden="true"><span style="width:${pct}%"></span></div>
+          <div class="pair-foot">
+            <span>Choice ${res.asked + 1} of about 30</span>
+            ${S.answers.length ? '<button class="btn link" data-act="undo">Undo last choice</button>' : "<span></span>"}
+          </div>
+        </section>`;
+      app.querySelectorAll(".pick").forEach((b) => b.addEventListener("click", () => {
+        S.answers.push(b.dataset.keep === x);
+        save(); render(false);
+      }));
+    },
+
+    ranked() {
+      app.innerHTML = `
+        <section class="screen">
+          <h1>Your priorities</h1>
+          <p>From your choices, this is what you would protect first (#1) and give up first (#12).</p>
+          <ol class="ranking">${S.ranking.map((c) => `<li><span>${esc(abilityByCode[c].name)}</span></li>`).join("")}</ol>
+          <div class="actions">
+            <button class="btn" data-go="consult">Meet the surgeon</button>
+            <button class="btn quiet" data-act="redo">Redo my choices</button>
+          </div>
+        </section>`;
+    },
+
+    consult() {
+      const chosen = S.pendingCorridor || null;
+      app.innerHTML = `
+        <section class="screen">
+          <h1>The consultation</h1>
+          <p>${esc(C.surgeonIntro)}</p>
+          ${C.corridors.map((c) => {
+            const isChosen = chosen === c.code;
+            return `<article class="corridor${isChosen ? " chosen" : ""}" id="cor-${c.code}">
+              <h3>${esc(c.name)}</h3>
+              <p class="approach">${esc(c.approach)}</p>
+              <ul class="risks">${c.risks.map((r) => {
+                const rank = rankOf(r.ability);
+                return `<li><span class="pct">${r.p}%</span>
+                  <span>${esc(abilityByCode[r.ability].name)}</span>
+                  <span class="tags">${r.temp >= 0.5 ? '<span class="chip often-temp">often temporary</span>' : ""}
+                  <span class="chip rank${rank && rank <= 3 ? " high" : ""}">your #${rank}</span></span></li>`;
+              }).join("")}</ul>
+              ${isChosen ? `
+                <div class="consent">
+                  <p>I understand the risks of this approach, and I choose it.</p>
+                  <label for="initials">Your initials</label>
+                  <input type="text" id="initials" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false">
+                  <div class="actions">
+                    <button class="btn" data-act="sign" disabled>Sign consent</button>
+                    <button class="btn quiet" data-act="unchoose">Choose a different route</button>
+                  </div>
+                </div>` : `<button class="btn quiet" data-choose="${c.code}">Choose this route</button>`}
+            </article>`;
+          }).join("")}
+        </section>`;
+      app.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
+        S.pendingCorridor = b.dataset.choose; save(); render(false);
+        const el = document.getElementById("cor-" + b.dataset.choose);
+        if (el) { el.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" }); const i = document.getElementById("initials"); if (i) i.focus({ preventScroll: true }); }
+      }));
+      const ini = document.getElementById("initials");
+      if (ini) ini.addEventListener("input", () => { app.querySelector('[data-act="sign"]').disabled = ini.value.trim().length < 1; });
+    },
+
+    gate() {
+      app.innerHTML = `
+        <section class="screen gate">
+          <h1>Your surgery is scheduled</h1>
+          <p>You chose: <b>${esc(corridorByCode[S.corridor].name)}</b>.</p>
+          <p>Wait for your instructor. When the class is ready, they will give you the word that starts your surgery.</p>
+          <label for="gateword" class="small muted">Word from your instructor</label>
+          <input type="text" id="gateword" autocomplete="off" autocapitalize="characters" spellcheck="false">
+          <div class="err" id="gate-err" role="alert"></div>
+          <div class="actions"><button class="btn" data-act="gate">Begin surgery</button></div>
+        </section>`;
+      const inp = document.getElementById("gateword");
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") tryGate(); });
+    },
+
+    surgery() {
+      if (!S.roll) doRoll();
+      const corr = corridorByCode[S.corridor];
+      const animate = !S.roll.shown && !reduceMotion;
+      app.innerHTML = `
+        <section class="screen">
+          <h1>In surgery</h1>
+          <p>For each structure in the path, the needle lands somewhere from 0 to 100. If it lands in the red zone, that structure is damaged.</p>
+          <ul class="roll">${corr.risks.map((r, i) => `
+            <li>
+              <div class="row-head"><span class="name">${esc(abilityByCode[r.ability].name)}</span><span class="verdict" id="v${i}"></span></div>
+              <div class="track"><div class="zone" style="width:${r.p}%"></div><div class="needle" id="n${i}"></div></div>
+              <div class="track-scale"><span>0</span><span>${r.p}% risk</span><span>100</span></div>
+            </li>`).join("")}</ul>
+          <div class="actions"><button class="btn" data-act="toReveal" id="toReveal" ${animate ? "hidden" : ""}>Wake up in recovery</button></div>
+        </section>`;
+      const finish = (i) => {
+        const res = S.roll.results[i];
+        const v = document.getElementById("v" + i);
+        v.textContent = res.hit ? "Damaged" : "Spared";
+        v.className = "verdict " + (res.hit ? "hit" : "miss");
+      };
+      if (!animate) {
+        S.roll.results.forEach((res, i) => { document.getElementById("n" + i).style.left = res.r + "%"; finish(i); });
+        if (!S.roll.shown) { S.roll.shown = true; save(); }
+        return;
+      }
+      let i = 0;
+      const next = () => {
+        if (i >= S.roll.results.length) {
+          S.roll.shown = true; save();
+          const b = document.getElementById("toReveal"); if (b) { b.hidden = false; b.focus(); }
+          return;
+        }
+        const idx = i++;
+        animateNeedle(document.getElementById("n" + idx), S.roll.results[idx].r, () => { finish(idx); setTimeout(next, 650); });
+      };
+      setTimeout(next, 500);
+    },
+
+    reveal() {
+      const corr = corridorByCode[S.corridor];
+      const res = S.roll.results;
+      const phase = S.phase === "later" ? "later" : "post";
+      const outcomes = res.map((r) => (r.hit ? (r.temp ? "T" : "P") : "S"));
+      const code = buildCode(S.ranking, corr.code, outcomes);
+
+      const lostNames = [], sparedNames = [];
+      res.forEach((r, i) => {
+        const nm = abilityByCode[corr.risks[i].ability].name.toLowerCase();
+        const lost = r.hit && !(phase === "later" && r.temp);
+        (lost ? lostNames : sparedNames).push(nm);
+      });
+      const uniq = (a) => [...new Set(a)];
+      const lostU = uniq(lostNames), sparedU = uniq(sparedNames).filter((n) => !lostU.includes(n));
+      const headline = lostU.length
+        ? `${phase === "later" ? "Still affected" : "Affected"}: <strong>${esc(listJoin(lostU))}</strong>.${sparedU.length ? ` Spared: ${esc(listJoin(sparedU))}.` : ""}`
+        : `Nothing in the path ${phase === "later" ? "is still affected" : "was damaged"}. Spared: ${esc(listJoin(sparedU))}.`;
+
+      // expected cost per corridor, weighted by this student's ranking
+      const n = S.ranking.length;
+      const costs = C.corridors.map((c) => ({
+        c, v: c.risks.reduce((s, r) => s + (r.p / 100) * (n + 1 - rankOf(r.ability)), 0)
+      }));
+      const maxCost = Math.max(...costs.map((x) => x.v)) || 1;
+      const best = costs.reduce((a, b) => (b.v < a.v ? b : a));
+      const myPlace = [...costs].sort((a, b) => a.v - b.v).findIndex((x) => x.c.code === corr.code) + 1;
+
+      app.innerHTML = `
+        <section class="screen">
+          <h1>After surgery</h1>
+          <p class="headline">${headline}</p>
+          <div class="toggle" role="group" aria-label="When">
+            <button data-phase="post" aria-pressed="${phase === "post"}">Right after surgery</button>
+            <button data-phase="later" aria-pressed="${phase === "later"}">Three months later</button>
+          </div>
+          <div class="film">
+            <div class="film-meta"><span>Left hemisphere, seen from the left side</span><span>Dashed shapes lie deep inside</span></div>
+            ${mapSVG(corr, outcomes, phase, "me")}
+            ${legendHTML()}
+          </div>
+          <ol class="findings">${corr.risks.map((r, i) => findingHTML(r, i, res[i], phase)).join("")}</ol>
+        </section>
+
+        <section>
+          <h2>Where the tumor was</h2>
+          <p>${esc(C.tumorReveal)}</p>
+        </section>
+
+        <section>
+          <h2>How your choice weighed against your priorities</h2>
+          <p>Each bar adds up every risk on that route, weighted by how highly you ranked the ability at stake. Shorter is safer for what you care about. ${
+            best.c.code === corr.code
+              ? "You chose the route with the lowest expected cost to your priorities."
+              : `Your choice ranked ${ordinal(myPlace)} of ${costs.length}. The lowest expected cost for you was \u201c${esc(best.c.name.toLowerCase())}.\u201d`}</p>
+          <ul class="cost">${costs.map((x) => `
+            <li class="${x.c.code === corr.code ? "mine" : ""}"><span class="lbl">${esc(x.c.name)}${x.c.code === corr.code ? " (your choice)" : ""}</span>
+            <span class="bar"><span style="width:${Math.max(4, (x.v / maxCost) * 100)}%"></span></span></li>`).join("")}</ul>
+          <p class="muted small">This compares odds, not outcomes. A sensible choice can still end badly, and a risky one can turn out fine.</p>
+        </section>
+
+        <section class="code-card">
+          <h2>Your result code</h2>
+          <p class="small muted" style="margin:0">It records your top three and bottom three priorities, your route, and what happened. Submit it the way your instructor asks.</p>
+          <div class="code" id="code">${esc(code)}</div>
+          <div class="actions" style="margin-top:0.5rem"><button class="btn" data-act="copy">Copy code</button><span id="copied" class="small muted" role="status"></span></div>
+        </section>
+
+        <section>
+          <h2>Compare with a classmate</h2>
+          <p>Enter a classmate\u2019s result code to see their outcome next to yours.</p>
+          <div style="display:flex; gap:0.6rem; flex-wrap:wrap">
+            <input type="text" id="peer" placeholder="${esc(C.version)}-\u2026" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:1 1 16rem">
+            <button class="btn quiet" data-act="compare">Compare</button>
+          </div>
+          <div id="peer-out" aria-live="polite"></div>
+        </section>
+
+        <section>
+          <h2>About this simulation</h2>
+          <p>${esc(C.simulationNote)}</p>
+        </section>`;
+
+      app.querySelectorAll("[data-phase]").forEach((b) => b.addEventListener("click", () => {
+        S.phase = b.dataset.phase; save();
+        const y = window.scrollY; render(false); window.scrollTo(0, y);
+        const t = app.querySelector(`[data-phase="${S.phase}"]`); if (t) t.focus({ preventScroll: true });
+      }));
+      document.getElementById("peer").addEventListener("keydown", (e) => { if (e.key === "Enter") doCompare(); });
+      if (S.peerCode) { document.getElementById("peer").value = S.peerCode; doCompare(true); }
+    }
+  };
+
+  /* ---------- actions ---------- */
+  app.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-go],[data-act]");
+    if (!t) return;
+    if (t.dataset.go) return go(t.dataset.go);
+    const a = t.dataset.act;
+    if (a === "undo") { S.answers.pop(); save(); render(false); }
+    else if (a === "redo") { S.answers = []; S.ranking = null; go("sort"); }
+    else if (a === "unchoose") { S.pendingCorridor = null; save(); render(false); }
+    else if (a === "sign") {
+      S.corridor = S.pendingCorridor; S.pendingCorridor = null;
+      go(gateEnabled ? "gate" : "surgery");
+    }
+    else if (a === "gate") tryGate();
+    else if (a === "toReveal") go("reveal");
+    else if (a === "copy") copyCode();
+    else if (a === "compare") doCompare();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (S.stage !== "sort" || e.target.matches("input,textarea")) return;
+    if (e.key === "ArrowLeft" || e.key === "1") { const b = app.querySelector('.pick[data-side="L"]'); if (b) b.click(); }
+    if (e.key === "ArrowRight" || e.key === "2") { const b = app.querySelector('.pick[data-side="R"]'); if (b) b.click(); }
+  });
+
+  function tryGate() {
+    const v = (document.getElementById("gateword").value || "").trim().toUpperCase();
+    if (v && v === gateWord) go("surgery");
+    else document.getElementById("gate-err").textContent = v ? "That isn\u2019t the word. Wait for your instructor." : "Enter the word your instructor gives you.";
+  }
+
+  function doRoll() {
+    const corr = corridorByCode[S.corridor];
+    S.roll = {
+      at: Date.now(),
+      shown: false,
+      results: corr.risks.map((r) => {
+        const roll = Math.floor(secureRandom() * 1000) / 10; // 0.0 – 99.9
+        const hit = roll < r.p;
+        return { r: roll, hit, temp: hit && secureRandom() < r.temp };
+      })
+    };
+    save(); // saved before anything is shown, so refreshing cannot re-roll
+  }
+
+  function animateNeedle(el, target, done) {
+    const dur = 1700, start = performance.now();
+    const amp = 38 + secureRandom() * 20, cycles = 2.5 + secureRandom();
+    function frame(now) {
+      const t = Math.min(1, (now - start) / dur);
+      const ease = 1 - Math.pow(1 - t, 3);
+      let pos = target + (1 - ease) * amp * Math.sin(t * cycles * 2 * Math.PI + 1.2);
+      pos = Math.max(0, Math.min(100, pos));
+      el.style.left = pos + "%";
+      if (t < 1) requestAnimationFrame(frame); else { el.style.left = target + "%"; done(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function copyCode() {
+    const code = document.getElementById("code").textContent;
+    const status = document.getElementById("copied");
+    const ok = () => (status.textContent = "Copied.");
+    const fallback = () => {
+      const r = document.createRange(); r.selectNodeContents(document.getElementById("code"));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      try { document.execCommand("copy"); ok(); } catch (e) { status.textContent = "Select the code and copy it."; }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(ok, fallback);
+    else fallback();
+  }
+
+  function doCompare(silent) {
+    const inp = document.getElementById("peer");
+    const out = document.getElementById("peer-out");
+    const r = parseCode(inp.value);
+    if (!r.ok) { if (!silent) out.innerHTML = `<p class="err" style="margin-top:0.75rem">${esc(r.message)}</p>`; return; }
+    S.peerCode = r.raw; save();
+    const myCorr = corridorByCode[S.corridor];
+    const myOut = S.roll.results.map((x) => (x.hit ? (x.temp ? "T" : "P") : "S"));
+    const peerCorr = corridorByCode[r.corridor];
+    const phase = S.phase === "later" ? "later" : "post";
+    const summary = (corr, outs, top, bottom) => {
+      const lost = corr.risks.filter((rk, i) => outs[i] === "P" || (outs[i] === "T" && phase === "post")).map((rk) => abilityByCode[rk.ability].name.toLowerCase());
+      return `<p class="who-line">${esc(corr.name)}. ${lost.length ? "Affected: " + esc(listJoin([...new Set(lost)])) + "." : "Nothing affected."}</p>
+        <p class="who-line">Protected first: ${esc(listJoin(top.map((c) => abilityByCode[c].name.toLowerCase())))}.</p>
+        <p class="who-line">Gave up first: ${esc(listJoin(bottom.slice().reverse().map((c) => abilityByCode[c].name.toLowerCase())))}.</p>`;
+    };
+    const same = myCorr.code === peerCorr.code;
+    out.innerHTML = `
+      ${same ? `<p style="margin-top:1rem">You both chose the same route${myOut.join("") === r.outcomes.join("") ? " and got the same outcome." : ", with different outcomes. Same odds, different brains."}</p>` : ""}
+      <div class="compare-grid">
+        <div><h3>You</h3>${summary(myCorr, myOut, S.ranking.slice(0, 3), S.ranking.slice(-3))}
+          <div class="film">${mapSVG(myCorr, myOut, phase, "c1", true)}</div></div>
+        <div><h3>Your classmate</h3>${summary(peerCorr, r.outcomes, r.top, r.bottom)}
+          <div class="film">${mapSVG(peerCorr, r.outcomes, phase, "c2", true)}</div></div>
+      </div>
+      <p class="muted small" style="margin-top:0.6rem">Showing ${phase === "later" ? "three months later" : "right after surgery"}. Use the switch above the main map to change.</p>`;
+  }
+
+  /* ---------- brain map ---------- */
+  function regionCenter(reg) {
+    if (reg.ellipse) return [reg.ellipse.cx, reg.ellipse.cy];
+    const nums = (reg.path.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+    let sx = 0, sy = 0, k = 0;
+    for (let i = 0; i + 1 < nums.length; i += 2) { sx += nums[i]; sy += nums[i + 1]; k++; }
+    return [sx / k, sy / k];
+  }
+  function shapeSVG(reg, cls) {
+    const dash = reg.deep ? ' stroke-dasharray="5 4"' : "";
+    if (reg.ellipse) {
+      const e = reg.ellipse;
+      return `<ellipse class="${cls}" cx="${e.cx}" cy="${e.cy}" rx="${e.rx}" ry="${e.ry}"${e.rot ? ` transform="rotate(${e.rot} ${e.cx} ${e.cy})"` : ""}${dash}/>`;
+    }
+    if (reg.stroke) return `<path class="${cls} fiber" d="${reg.path}" fill="none" stroke-width="${reg.width || 6}"${dash}/>`;
+    return `<path class="${cls}" d="${reg.path}"${dash}/>`;
+  }
+  function stateOf(o, phase) {
+    if (o === "P") return "perm";
+    if (o === "T") return phase === "later" ? "recovered" : "temp";
+    return "spared";
+  }
+  function mapSVG(corr, outcomes, phase, idp, compact) {
+    const M = C.map;
+    const involved = {};
+    corr.risks.forEach((r, i) => {
+      const st = stateOf(outcomes[i], phase);
+      const rank = { perm: 3, temp: 2, recovered: 1, spared: 0 };
+      if (!involved[r.region] || rank[st] > rank[involved[r.region]]) involved[r.region] = st;
+    });
+    const ghost = Object.keys(M.regions).filter((k) => !involved[k]).map((k) => shapeSVG(M.regions[k], "ghost")).join("");
+    const active = Object.keys(involved).map((k) => shapeSVG(M.regions[k], "reg " + involved[k])).join("");
+    // numbered markers, offset when several risks share a region
+    const perRegion = {}, seen = {};
+    corr.risks.forEach((r) => (perRegion[r.region] = (perRegion[r.region] || 0) + 1));
+    const T0 = M.tumor;
+    const markers = corr.risks.map((r, i) => {
+      const reg = M.regions[r.region];
+      let [x, y] = reg.mark || regionCenter(reg);
+      const m = perRegion[r.region], k = seen[r.region] = (seen[r.region] || 0) + 1;
+      if (m > 1) {
+        // fan several markers for the same structure in an arc around its upper right
+        const e = reg.ellipse || { rx: 20, ry: 20 };
+        const rad = Math.max(e.rx, e.ry) + 18;
+        const ang = (-60 + (k - 1 - (m - 1) / 2) * 42) * Math.PI / 180;
+        x += rad * Math.cos(ang); y += rad * Math.sin(ang);
+      } else if (Math.hypot(x - T0.cx, y - T0.cy) < T0.r + 12) {
+        y -= T0.r + 16; // keep the tumor visible
+      }
+      const st = stateOf(outcomes[i], phase);
+      return `<g class="mk ${st}"><circle cx="${x}" cy="${y}" r="10"/><text x="${x}" y="${y + 4}" text-anchor="middle">${i + 1}</text></g>`;
+    }).join("");
+    const tunnel = corr.tunnel
+      ? `<line class="tunnel" x1="${corr.tunnel[0][0]}" y1="${corr.tunnel[0][1]}" x2="${corr.tunnel[1][0]}" y2="${corr.tunnel[1][1]}"/>
+         <line class="tunnel-core" x1="${corr.tunnel[0][0]}" y1="${corr.tunnel[0][1]}" x2="${corr.tunnel[1][0]}" y2="${corr.tunnel[1][1]}"/>`
+      : "";
+    const T = M.tumor;
+    const desc = corr.risks.map((r, i) => `${i + 1}: ${M.regions[r.region].label}, ${({ perm: "damaged", temp: "damaged, may recover", recovered: "recovered", spared: "spared" })[stateOf(outcomes[i], phase)]}`).join("; ");
+    return `<svg viewBox="0 0 500 345" role="img" aria-labelledby="t-${idp}">
+      <title id="t-${idp}">Brain map for ${esc(corr.name.toLowerCase())}. ${esc(desc)}</title>
+      <style>
+        .outline{fill:rgba(143,169,184,0.06);stroke:#8fa9b8;stroke-width:2}
+        .sulcus{fill:none;stroke:#4d6879;stroke-width:1.6;stroke-linecap:round}
+        .hind{fill:rgba(143,169,184,0.04);stroke:#3a5263;stroke-width:1.4}
+        .ghost{fill:none;stroke:#2f4757;stroke-width:1.1}
+        .ghost.fiber{stroke-width:1.2 !important}
+        .reg{stroke-width:2.2}
+        .reg.spared{fill:rgba(220,231,237,0.08);stroke:#dce7ed}
+        .reg.perm{fill:rgba(232,85,70,0.72);stroke:#ff7a6a}
+        .reg.temp{fill:rgba(230,168,60,0.7);stroke:#f3c26e}
+        .reg.recovered{fill:rgba(92,195,182,0.25);stroke:#5cc3b6}
+        .fiber.reg.perm{stroke:#ff6f5e;fill:none}
+        .fiber.reg.temp{stroke:#f3b64f;fill:none}
+        .fiber.reg.recovered{stroke:#5cc3b6;fill:none}
+        .fiber.reg.spared{stroke:#dce7ed;fill:none}
+        .tunnel{stroke:rgba(220,231,237,0.22);stroke-width:14;stroke-linecap:round}
+        .tunnel-core{stroke:#dce7ed;stroke-width:1.6;stroke-dasharray:2 5;stroke-linecap:round}
+        .tumor{fill:#f0e3b0;stroke:#fff6d6;stroke-width:1.5}
+        .tumor-halo{fill:none;stroke:#f0e3b0;stroke-opacity:.45;stroke-width:1.2;stroke-dasharray:3 3}
+        .mk circle{fill:#13212b;stroke:#dce7ed;stroke-width:1.6}
+        .mk.perm circle{stroke:#ff7a6a}
+        .mk.temp circle{stroke:#f3c26e}
+        .mk.recovered circle{stroke:#5cc3b6}
+        .mk text{fill:#fff;font:700 11px Atkinson Hyperlegible,system-ui,sans-serif}
+        .lbl{fill:#8fa9b8;font:12px Atkinson Hyperlegible,system-ui,sans-serif}
+      </style>
+      <path class="hind" d="M332 262 C350 250 420 246 448 262 C470 276 458 304 424 310 C390 316 350 306 334 290 C326 282 326 270 332 262 Z"/>
+      <path class="hind" d="M276 262 C283 290 287 316 283 342 L307 342 C306 316 309 290 318 262 Z"/>
+      <path class="outline" d="M45 185 C30 120 70 55 150 36 C220 20 320 24 382 60 C440 95 470 150 455 205 C446 236 416 252 386 250 C342 264 252 286 182 279 C138 275 114 256 126 232 C130 224 110 222 96 226 C72 230 50 212 45 185 Z"/>
+      <path class="sulcus" d="M134 222 C188 206 250 196 302 172"/>
+      <path class="sulcus" d="M242 28 C234 80 214 140 206 202"/>
+      <path class="sulcus" d="M300 46 C320 90 360 120 420 128"/>
+      <path class="sulcus" d="M150 236 C200 228 260 222 316 214"/>
+      ${ghost}
+      ${tunnel}
+      ${active}
+      ${corr.tunnel ? "" : `<circle class="tumor-halo" cx="${T.cx}" cy="${T.cy}" r="${T.r + 14}"/>`}
+      <circle class="tumor" cx="${T.cx}" cy="${T.cy}" r="${T.r}"/>
+      ${markers}
+      ${compact ? "" : `<text class="lbl" x="30" y="330">Front</text><text class="lbl" x="470" y="330" text-anchor="end">Back</text>`}
+    </svg>`;
+  }
+  function legendHTML() {
+    return `<div class="legend" aria-hidden="true">
+      <span><i style="background:#f0e3b0"></i>Tumor</span>
+      <span><i style="background:rgba(232,85,70,0.85)"></i>Damaged</span>
+      <span><i style="background:rgba(230,168,60,0.85)"></i>Damaged, may recover</span>
+      <span><i style="background:rgba(92,195,182,0.5);border:1.5px solid #5cc3b6"></i>Recovered</span>
+      <span><i style="border:1.5px solid #dce7ed"></i>In the path, spared</span>
+    </div>`;
+  }
+
+  function findingHTML(r, i, res, phase) {
+    const a = abilityByCode[r.ability];
+    const rank = rankOf(r.ability);
+    const st = stateOf(res.hit ? (res.temp ? "T" : "P") : "S", phase);
+    const chip = {
+      perm: '<span class="chip perm">Damaged</span>',
+      temp: '<span class="chip temp">Damaged, may recover</span>',
+      recovered: '<span class="chip recovered">Recovered</span>',
+      spared: '<span class="chip spared">Spared</span>'
+    }[st];
+    let body;
+    if (st === "spared") body = `<p class="effect muted">The needle landed at ${res.r}, outside the ${r.p}% risk zone. Had it been damaged: ${esc(lowerFirst(r.effect))}</p>`;
+    else if (st === "recovered") body = `<p class="effect muted">This damage faded over the following weeks as the brain adapted. It had meant: ${esc(lowerFirst(r.effect))}</p>`;
+    else body = `<p class="effect">${esc(r.effect)}</p>${r.field ? vfHTML(r.field) : ""}`;
+    return `<li><span class="num">${i + 1}</span><div>
+      <div class="title"><b>${esc(a.name)}</b><span class="chip rank${rank <= 3 ? " high" : ""}">your #${rank}</span>${chip}</div>
+      <div class="structure">${esc(r.structure)}</div>${body}</div></li>`;
+  }
+
+  function vfHTML(kind) {
+    const lost = {
+      upperRight: "M30 30 L30 6 A24 24 0 0 1 54 30 Z",
+      lowerRight: "M30 30 L54 30 A24 24 0 0 1 30 54 Z",
+      rightHalf: "M30 6 A24 24 0 0 1 30 54 Z"
+    }[kind];
+    if (!lost) return "";
+    const eye = (dx) => `<g transform="translate(${dx} 0)"><circle cx="30" cy="30" r="24" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <path d="${lost}" fill="currentColor"/><line x1="30" y1="4" x2="30" y2="56" stroke="currentColor" stroke-width="0.6" opacity=".5"/>
+      <line x1="4" y1="30" x2="56" y2="30" stroke="currentColor" stroke-width="0.6" opacity=".5"/></g>`;
+    return `<div class="vf"><svg viewBox="0 0 130 72" role="img" aria-label="Visual field: shaded area is lost in both eyes">${eye(0)}${eye(68)}
+      <text x="30" y="70" text-anchor="middle" font-size="9" fill="currentColor">Left eye</text><text x="98" y="70" text-anchor="middle" font-size="9" fill="currentColor">Right eye</text></svg>
+      <span>What each eye sees. The dark area is missing.</span></div>`;
+  }
+
+  /* ---------- small helpers ---------- */
+  function listJoin(a) { return a.length < 2 ? a.join("") : a.length === 2 ? a.join(" and ") : a.slice(0, -1).join(", ") + ", and " + a[a.length - 1]; }
+  function lowerFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+  function ordinal(n) { const s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+
+  // Resume where the student left off; never let a saved surgery be re-rolled.
+  if (S.roll && S.stage !== "reveal" && S.stage !== "surgery") S.stage = "reveal";
+  render(false);
+})();
+</script>
+</body>
+</html>
