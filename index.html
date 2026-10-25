@@ -122,10 +122,6 @@
     word-break: break-all; background: var(--paper); border-radius: 8px; padding: 0.7rem 0.85rem; margin: 0.6rem 0;
     user-select: all;
   }
-  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-  @media (max-width: 680px) { .compare-grid { grid-template-columns: 1fr; } }
-  .compare-grid h3 { font-size: 1rem; margin: 0.6rem 0 0.2rem; }
-  .compare-grid .who-line { font-size: 0.9rem; color: var(--muted); margin: 0 0 0.5rem; }
   .err { color: var(--damage); font-weight: 700; }
   section + section { margin-top: 2.5rem; }
   .reset-row { margin-top: 3rem; font-size: 0.85rem; }
@@ -147,7 +143,7 @@
 <script src="sim-core.js"></script>
 <script>
 (function () {
-  const { C, abilityByCode, corridorByCode, esc, buildCode, parseCode, secureRandom } = window.SIM;
+  const { C, abilityByCode, corridorByCode, esc, buildCode, secureRandom } = window.SIM;
   const app = document.getElementById("app");
   const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -468,16 +464,6 @@
         </section>
 
         <section>
-          <h2>Compare with a classmate</h2>
-          <p>Enter a classmate\u2019s result code to see their outcome next to yours.</p>
-          <div style="display:flex; gap:0.6rem; flex-wrap:wrap">
-            <input type="text" id="peer" placeholder="${esc(C.version)}-\u2026" autocomplete="off" autocapitalize="characters" spellcheck="false" style="flex:1 1 16rem">
-            <button class="btn quiet" data-act="compare">Compare</button>
-          </div>
-          <div id="peer-out" aria-live="polite"></div>
-        </section>
-
-        <section>
           <h2>About this simulation</h2>
           <p>${esc(C.simulationNote)}</p>
         </section>`;
@@ -487,8 +473,6 @@
         const y = window.scrollY; render(false); window.scrollTo(0, y);
         const t = app.querySelector(`[data-phase="${S.phase}"]`); if (t) t.focus({ preventScroll: true });
       }));
-      document.getElementById("peer").addEventListener("keydown", (e) => { if (e.key === "Enter") doCompare(); });
-      if (S.peerCode) { document.getElementById("peer").value = S.peerCode; doCompare(true); }
     }
   };
 
@@ -508,7 +492,6 @@
     else if (a === "gate") tryGate();
     else if (a === "toReveal") go("reveal");
     else if (a === "copy") copyCode();
-    else if (a === "compare") doCompare();
   });
   document.addEventListener("keydown", (e) => {
     if (S.stage !== "sort" || e.target.matches("input,textarea")) return;
@@ -563,34 +546,6 @@
     else fallback();
   }
 
-  function doCompare(silent) {
-    const inp = document.getElementById("peer");
-    const out = document.getElementById("peer-out");
-    const r = parseCode(inp.value);
-    if (!r.ok) { if (!silent) out.innerHTML = `<p class="err" style="margin-top:0.75rem">${esc(r.message)}</p>`; return; }
-    S.peerCode = r.raw; save();
-    const myCorr = corridorByCode[S.corridor];
-    const myOut = S.roll.results.map((x) => (x.hit ? (x.temp ? "T" : "P") : "S"));
-    const peerCorr = corridorByCode[r.corridor];
-    const phase = S.phase === "later" ? "later" : "post";
-    const summary = (corr, outs, top, bottom) => {
-      const lost = corr.risks.filter((rk, i) => outs[i] === "P" || (outs[i] === "T" && phase === "post")).map((rk) => abilityByCode[rk.ability].name.toLowerCase());
-      return `<p class="who-line">${esc(corr.name)}. ${lost.length ? "Affected: " + esc(listJoin([...new Set(lost)])) + "." : "Nothing affected."}</p>
-        <p class="who-line">Protected first: ${esc(listJoin(top.map((c) => abilityByCode[c].name.toLowerCase())))}.</p>
-        <p class="who-line">Gave up first: ${esc(listJoin(bottom.slice().reverse().map((c) => abilityByCode[c].name.toLowerCase())))}.</p>`;
-    };
-    const same = myCorr.code === peerCorr.code;
-    out.innerHTML = `
-      ${same ? `<p style="margin-top:1rem">You both chose the same route${myOut.join("") === r.outcomes.join("") ? " and got the same outcome." : ", with different outcomes. Same odds, different brains."}</p>` : ""}
-      <div class="compare-grid">
-        <div><h3>You</h3>${summary(myCorr, myOut, S.ranking.slice(0, 3), S.ranking.slice(-3))}
-          <div class="film">${mapSVG(myCorr, myOut, phase, "c1", true)}</div></div>
-        <div><h3>Your classmate</h3>${summary(peerCorr, r.outcomes, r.top, r.bottom)}
-          <div class="film">${mapSVG(peerCorr, r.outcomes, phase, "c2", true)}</div></div>
-      </div>
-      <p class="muted small" style="margin-top:0.6rem">Showing ${phase === "later" ? "three months later" : "right after surgery"}. Use the switch above the main map to change.</p>`;
-  }
-
   /* ---------- brain map ---------- */
   function regionCenter(reg) {
     if (reg.ellipse) return [reg.ellipse.cx, reg.ellipse.cy];
@@ -613,7 +568,7 @@
     if (o === "T") return phase === "later" ? "recovered" : "temp";
     return "spared";
   }
-  function mapSVG(corr, outcomes, phase, idp, compact) {
+  function mapSVG(corr, outcomes, phase, idp) {
     const M = C.map;
     const involved = {};
     corr.risks.forEach((r, i) => {
@@ -690,7 +645,7 @@
       ${corr.tunnel ? "" : `<circle class="tumor-halo" cx="${T.cx}" cy="${T.cy}" r="${T.r + 14}"/>`}
       <circle class="tumor" cx="${T.cx}" cy="${T.cy}" r="${T.r}"/>
       ${markers}
-      ${compact ? "" : `<text class="lbl" x="30" y="330">Front</text><text class="lbl" x="470" y="330" text-anchor="end">Back</text>`}
+      <text class="lbl" x="30" y="330">Front</text><text class="lbl" x="470" y="330" text-anchor="end">Back</text>
     </svg>`;
   }
   function legendHTML() {
