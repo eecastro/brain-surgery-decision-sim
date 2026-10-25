@@ -4,7 +4,7 @@ A pre-surgery decision simulation for introductory neuropsychology and biopsycho
 
 Students imagine they are graduating high school seniors diagnosed with a tumor deep in the left side of the brain. They decide, two abilities at a time, what they would most want to protect. A neurosurgeon then offers several routes to the tumor, each passing through different brain tissue with different risks. Students choose a route, sign consent, and the surgery is "rolled." The reveal shows which structures were damaged on a brain map, names them anatomically, and shows which deficits fade after three months. The goal is for students to feel how hard these trade-offs are for real patients, and to arrive at the anatomy lecture already caring about the structures they just lost.
 
-**Developed by Eric E Castro, Psychology Department, St Ignatius College Prep.**
+**Developed by Eric E Castro, Psychology Department, St Ignatius College Prep, 2026.**
 
 ## What students do
 
@@ -12,9 +12,9 @@ Students imagine they are graduating high school seniors diagnosed with a tumor 
 2. **Priorities.** About 30 "which would you keep?" choices between 12 everyday abilities, such as remembering new things, understanding speech, walking, and seeing everything around you. The page sorts these choices into a ranking from #1 to #12.
 3. **Consultation.** Five options: four surgical routes (through the front, through the top and back, through the side, and down between the two hemispheres) and a no-surgery option. Each lists its risks as percentages, with the student's own ranking shown beside each risk. Students choose one and sign with their initials.
 4. **Surgery.** After an optional "wait for your instructor" pause, a needle lands somewhere from 0 to 100 for each structure in the path. Landing in the risk zone means damage.
-5. **Recovery.** A brain map shows the route, the tumor, and every structure in the path, marked as damaged, damaged but may recover, or spared. A switch shows the outcome three months later. Students also see how their choice compared with the other routes given their own priorities, get a result code, and can enter a classmate's code to see both outcomes side by side.
+5. **Recovery.** A brain map shows the route, the tumor, and every structure in the path, marked as damaged, damaged but may recover, or spared. A switch shows the outcome three months later. Students also see how their choice compared with the other routes given their own priorities, and get a result code to submit.
 
-Plan for roughly 25 to 35 minutes, including time for students to compare results with their neighbors.
+Plan for roughly 25 to 35 minutes, including time for students to discuss their outcomes with their neighbors.
 
 ## Files
 
