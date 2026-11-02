@@ -32,11 +32,23 @@ window.SIM_CONTENT = {
   //   index.html?gate=off        skip the "wait for your instructor" pause
   //   index.html?gate=SCALPEL    use SCALPEL as today's unlock word
   //   index.html?reset=1         clear the saved progress on this device
+  //   index.html?section=P3      tag results sent to the Google Sheet with a class section
+  //
+  // sheetUrl: the Google Apps Script web app address (ends in /exec) from Code.gs.
+  // When it is set, each student's result code (never their name) is sent to your Google Sheet
+  // as soon as the surgery is rolled, and results.html can load the class's codes from it.
+  // Leave it empty ("") and nothing is sent anywhere; students copy their codes instead.
   settings: {
     gateEnabled: true,
     gateWord: "INCISION",
-    storageKey: "brain-surgery-sim"
+    storageKey: "brain-surgery-sim",
+    sheetUrl: ""
   },
+
+  // Shown under the result code when sheetUrl is set. Make sure it is true for your class.
+  sendingNote:
+    "Your result code, today\u2019s date, and your class section were sent to your instructor\u2019s class results. " +
+    "Your name is not sent; it stays on this device for your PDF.",
 
   title: "Where Should the Surgeon Go?",
   subtitle: "A pre-surgery decision simulation",

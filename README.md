@@ -24,10 +24,11 @@ Plan for roughly 25 to 35 minutes, including time for students to discuss their 
 | `results.html` | The instructor's class results page. |
 | `content.js` | All the editable content: story, abilities, routes, risks, wording, settings, and the brain map shapes. |
 | `sim-core.js` | Shared code for result codes. No editing needed. |
+| `Code.gs` | Optional Google Apps Script that saves each result code to a Google Sheet and sends the class's codes to `results.html`. |
 | `style.css` | Shared styles. |
 | `LICENSE` | The CC BY 4.0 license. |
 
-There is no build step and no server. The pages work as plain files.
+There is no build step and no server. The pages work as plain files. The Google Sheet connection is optional; with `sheetUrl` left empty, nothing is sent anywhere.
 
 ## Put it online with GitHub Pages
 
@@ -59,9 +60,44 @@ Students use that link. The results page is at the same address followed by `res
 
 **Content note.** The activity opens with a short content note inviting students who have personal or family experience with brain tumors, stroke, or brain surgery to sit out or watch alongside a classmate. You can edit this text in `content.js`.
 
+## Collecting results automatically with a Google Sheet
+
+With a short Google Apps Script, each student's result code goes straight to a Google Sheet the moment their surgery is rolled, and `results.html` loads the class's codes from that Sheet. Students don't have to copy or submit anything. Plan on about 15 minutes, once.
+
+**What is sent:** the result code, the date (no time of day), the optional section code from the link, which attempt this is on that device, and a random ID that lets a retry update the same row instead of adding a duplicate. The name a student types for their PDF is **never** sent.
+
+### Set up the Sheet
+
+1. Open (or create) the Google Sheet, then **Extensions > Apps Script**. Delete the starter code, paste in everything from `Code.gs`, and save.
+2. In the function menu, choose `setup` and click **Run**. Approve the permissions Google asks for. This creates two tabs:
+   - **Responses:** one row per surgery: date, school year, semester, section, result code, the top three and bottom three priorities, route, outcomes, and counts of permanent, temporary, and spared structures
+   - **Summary:** routes chosen and average deficits by school year, and which ability the class ranked #1
+3. Choose `setResultsKey` and click **Run**. Copy the key it shows; you'll paste it into `results.html`. Keep it away from students. Running it again replaces the key.
+4. Click **Deploy > New deployment**, choose type **Web app**, set **Execute as: Me** and **Who has access: Anyone**, and click **Deploy**. Copy the web app URL (it ends in `/exec`).
+5. Check it: open the URL in a browser. You should see `{"ok":true,"message":"Brain surgery simulation collector is running."}`. A sign-in page means the access setting is not "Anyone." Some school Google Workspace accounts block this; if so, ask IT or deploy from a personal account.
+
+### Connect the activity
+
+1. In `content.js`, find `sheetUrl: ""` under `settings` and paste your web app URL between the quotes.
+2. Read `sendingNote` just below it. Students see it under their result code, so make sure it accurately describes what your class agreed to.
+3. Upload `content.js` to GitHub.
+4. Test it: go through the activity with `index.html?gate=off&section=TEST`. A row should appear in the Responses tab within a few seconds. Delete your test row afterward.
+
+**Sections.** Give each class its own link, such as `index.html?section=P3` (you can combine it with the gate word: `index.html?section=P3&gate=SCALPEL`).
+
+**Retries and do-overs.** If a student's connection drops, the page keeps trying and the same row is updated, so there are no duplicates. **Start over** begins a new attempt, which is saved as a new row with its attempt number. In `results.html`, tick **First attempt on each device only** to count only first results. (Attempts are counted per device, so a student who switches devices or uses a private window starts again at 1.)
+
+### See the class results
+
+Open `results.html`, paste the results key, and choose **Load results**. Tick "Remember the key on this device" only on your own computer. Filter by school year, semester, and section; the charts update as you change them. The pasted-codes box still works alongside the Sheet.
+
+### Updating the script later
+
+After changing `Code.gs`, publish it again with **Deploy > Manage deployments > Edit** (pencil icon) **> Version: New version > Deploy**. The web app URL stays the same. If you change the abilities or routes in `content.js`, update `ABILITIES` and `ROUTES` at the top of `Code.gs` to match, or the Sheet will reject the new codes.
+
 ## Collecting results with Google Forms
 
-The activity is not connected to Google Forms or any other service, so it works the same for anyone who uses or forks it. Students copy their result code, and you collect the codes however you like. With Google Forms:
+If you'd rather not set up the Sheet script, students copy their result code, and you collect the codes however you like. With Google Forms:
 
 1. Create a form with one **Short answer** question, such as "Paste your result code." Add a name question too if you want one.
 2. In the form's **Responses** tab, choose **Link to Sheets** to send responses to a Google Sheets spreadsheet.
@@ -96,7 +132,7 @@ The ability and route abbreviations are listed in `content.js`. Codes can be typ
 
 Everything students read is in `content.js`, including the credit line (see [License](#license) for what to keep), and the story, the 12 abilities, the five routes, each risk's percentage, its chance of recovering, the anatomical names, and the description of each deficit. Open it in any text editor or directly on GitHub.
 
-**If you change the abilities, add or remove a route, or change the number or order of risks on any route, also change `version`** (for example, from `"V1"` to `"V2"`). Result codes carry the version, and the results page counts only codes that match its own version. This prevents codes from different versions being misread. Wording changes and percentage changes do not require a new version.
+**If you change the abilities, add or remove a route, or change the number or order of risks on any route, also change `version`** (and, if you use the Google Sheet, `ABILITIES` and `ROUTES` in `Code.gs`) (for example, from `"V1"` to `"V2"`). Result codes carry the version, and the results page counts only codes that match its own version. This prevents codes from different versions being misread. Wording changes and percentage changes do not require a new version.
 
 The brain map at the bottom of `content.js` defines the shapes for each structure on a 500 by 345 drawing of the left hemisphere seen from the left side, with the front of the head on the left. Each risk names one of these structures with `region`, and each route's `tunnel` gives the start and end points of the path drawn to the tumor. You only need to edit the map if you add a structure that is not already drawn.
 
@@ -106,7 +142,7 @@ The simulation exaggerates on purpose, and says so to students at the end. Real 
 
 ## Privacy
 
-The activity does not collect, send, or store any student data outside the student's own browser. Progress, including the name a student types for their PDF, is saved in the browser's local storage on that device only, and **Start over** erases it. The only outside request the pages make is for the Atkinson Hyperlegible typeface from Google Fonts; if it cannot load, the pages fall back to the device's system font.
+With `sheetUrl` empty (the default), the activity does not collect, send, or store any student data outside the student's own browser. If you connect a Google Sheet, each result code is sent to it along with the date, section code, attempt number, and a random ID, as described above; nothing else is sent. Progress, including the name a student types for their PDF, is saved in the browser's local storage on that device only, and **Start over** erases it. The only outside request the pages make is for the Atkinson Hyperlegible typeface from Google Fonts; if it cannot load, the pages fall back to the device's system font.
 
 ## License
 
