@@ -173,8 +173,8 @@
 <main class="wrap" id="app" tabindex="-1"></main>
 <footer class="wrap credits" id="credits"></footer>
 
-<script src="content.js"></script>
-<script src="sim-core.js"></script>
+<script src="content.js?v=2"></script>
+<script src="sim-core.js?v=2"></script>
 <script>
 (function () {
   const { C, abilityByCode, corridorByCode, esc, buildCode, secureRandom } = window.SIM;
@@ -520,14 +520,21 @@
           <ol class="ranking">${S.ranking.map((c) => `<li><span>${esc(abilityByCode[c].name)}</span></li>`).join("")}</ol>
         </section>
 
-        <section class="code-card">
+        ${SHARING ? `<section class="code-card">
+          <h2>Your class results</h2>
+          <p id="send-status" role="status" style="margin:0;font-weight:700">${sendStatusText()}</p>
+          <p class="small muted" style="margin:0.4rem 0 0">${esc(C.sendingNote || "")}</p>
+          <details id="code-fallback" class="small" style="margin-top:0.75rem"${S.sendError ? " open" : ""}>
+            <summary>Result code (only if your instructor asks for it)</summary>
+            <div class="code" id="code">${esc(code)}</div>
+            <div class="actions" style="margin-top:0.5rem"><button class="btn quiet" data-act="copy">Copy code</button><span id="copied" class="small muted" role="status"></span></div>
+          </details>
+        </section>` : `<section class="code-card">
           <h2>Your result code</h2>
           <p class="small muted" style="margin:0">It records your top three and bottom three priorities, your route, and what happened. Submit it the way your instructor asks.</p>
           <div class="code" id="code">${esc(code)}</div>
           <div class="actions" style="margin-top:0.5rem"><button class="btn" data-act="copy">Copy code</button><span id="copied" class="small muted" role="status"></span></div>
-          ${SHARING ? `<p class="small" id="send-status" role="status" style="margin:0.75rem 0 0">${S.sent ? "Sent to your class results." : "Sending to your class results\u2026"}</p>
-          <p class="small muted" style="margin:0.25rem 0 0">${esc(C.sendingNote || "")}</p>` : ""}
-        </section>
+        </section>`}
 
         <section>
           <h2>About this simulation</h2>
@@ -552,6 +559,7 @@
       }));
       document.getElementById("pname").addEventListener("input", (e) => { S.name = e.target.value.slice(0, 80); save(); });
       sendResult(code);
+      showSendStatus();
     }
   };
 
@@ -632,32 +640,59 @@
   // ID go out; the name typed for the PDF never leaves the device. Resending the same ID updates
   // the same row, so a retry after a dropped connection cannot create a duplicate.
   let sending = false, retryTimer = null;
+  function sendStatusText() {
+    if (S.sent) return "Your result was saved to your class results. You don\u2019t need to submit anything else.";
+    if (S.sendError) return S.sendError;
+    return "Saving your result to your class results\u2026";
+  }
+  function showSendStatus() {
+    const el = document.getElementById("send-status");
+    if (el) el.textContent = sendStatusText();
+    const fb = document.getElementById("code-fallback");
+    if (fb && S.sendError && !S.sent) fb.open = true;
+  }
   function sendResult(code) {
-    if (!SHARING || S.sent || sending) return;
+    if (!SHARING || S.sent || S.rejected || sending) return;
     if (!S.id) { S.id = newId(); save(); }
     sending = true;
-    const status = (t) => { const el = document.getElementById("send-status"); if (el) el.textContent = t; };
-    // text/plain + no-cors avoids a CORS preflight, which Apps Script can't answer
+    const retry = () => {
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => sendResult(code), 15000);
+    };
+    // A plain-text POST is a "simple" request, so there is no CORS preflight, and Apps Script's
+    // reply can be read. The page only says "saved" when the Sheet confirms it.
     fetch(SHEET_URL, {
       method: "POST",
-      mode: "no-cors",
-      keepalive: true,
+      redirect: "follow",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ code, section: SECTION, id: S.id, attempt: S.attempt || 1, v: C.version })
-    }).then(() => {
-      sending = false; S.sent = true; save();
-      status("Sent to your class results.");
-    }).catch(() => {
+    }).then((r) => r.json()).then((d) => {
       sending = false;
-      status("Couldn\u2019t reach the class results. It will try again; you can also copy your code.");
-      clearTimeout(retryTimer);
-      retryTimer = setTimeout(() => { if (S.stage === "reveal") sendResult(code); }, 15000);
+      if (d && d.ok) { S.sent = true; S.sendError = ""; save(); showSendStatus(); return; }
+      // The Sheet answered but refused the result: retrying won't help, so offer the code instead.
+      S.rejected = true;
+      S.sendError = "The class results sheet couldn\u2019t save this result" + (d && d.error ? " (" + d.error + ")" : "") +
+        ". Tell your instructor, and copy your result code below if they ask for it.";
+      save(); showSendStatus();
+    }).catch(() => {
+      // No answer we can read: offline, or the web app isn't deployed for "Anyone".
+      // Send a blind copy too (same ID, so it can't duplicate a row), then keep trying for a confirmation.
+      try {
+        fetch(SHEET_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ code, section: SECTION, id: S.id, attempt: S.attempt || 1, v: C.version }) }).catch(() => {});
+      } catch (e) {}
+      sending = false;
+      S.sendError = "Couldn\u2019t reach the class results yet. Keep this page open and it will try again. If this doesn\u2019t change, tell your instructor.";
+      save(); showSendStatus(); retry();
     });
   }
 
   function startOver() {
-    const ok = window.confirm("Start over? This erases your choices, your surgery result, and your result code on this device. If you need your result, save the PDF or copy the code first.");
+    const ok = window.confirm(SHARING && S.sent
+      ? "Start over? This erases your choices and your surgery result on this device. The result already saved to your class results stays there, and your new attempt is saved as a new attempt."
+      : "Start over? This erases your choices, your surgery result, and your result code on this device. If you need your result, save the PDF or copy the code first.");
     if (!ok) return;
+    clearTimeout(retryTimer);
     const attempt = (S.attempt || 1) + (S.roll ? 1 : 0);
     S = freshState();
     S.attempt = attempt;

@@ -47,7 +47,7 @@ window.SIM_CONTENT = {
 
   // Shown under the result code when sheetUrl is set. Make sure it is true for your class.
   sendingNote:
-    "Your result code, today\u2019s date, and your class section were sent to your instructor\u2019s class results. " +
+    "What is saved: your top and bottom priorities, your route, what happened in surgery, today\u2019s date, and your class section. " +
     "Your name is not sent; it stays on this device for your PDF.",
 
   title: "Where Should the Surgeon Go?",
