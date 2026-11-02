@@ -42,7 +42,7 @@ window.SIM_CONTENT = {
     gateEnabled: true,
     gateWord: "INCISION",
     storageKey: "brain-surgery-sim",
-    sheetUrl: ""
+    sheetUrl: "https://script.google.com/macros/s/AKfycbxiwsYn0LaVRvIyeq2oKd3YuIjQ57aFJlfdqbmGiWaApwE8bUQvUJw3xR8GSRyu-jDHZA/exec"
   },
 
   // Shown under the result code when sheetUrl is set. Make sure it is true for your class.
