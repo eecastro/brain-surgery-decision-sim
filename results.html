@@ -48,6 +48,13 @@
   th { font-size: 0.9rem; color: var(--muted); font-weight: 700; }
   td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
   .empty { padding: 2rem 0; color: var(--muted); }
+  .sheet-box { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.2rem 1.3rem; margin: 1.5rem 0 2rem; }
+  .sheet-box h2 { margin-top: 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: end; margin-top: 1rem; }
+  .filters label { display: grid; gap: 0.25rem; font-size: 0.95rem; }
+  .filters select { font: inherit; color: var(--ink); background: var(--sheet); border: 2px solid var(--line); border-radius: var(--radius); padding: 0.45rem 0.6rem; min-height: 44px; }
+  .filters .check { display: flex; gap: 0.5rem; align-items: center; min-height: 44px; }
+  .err { color: var(--damage); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -58,7 +65,34 @@
 </header>
 <main class="wrap">
   <h1>Class results</h1>
-  <p>Paste the column of result codes from your Google Forms response spreadsheet. Select the whole column in the linked Google Sheet, copy it, and paste it here. The header cell, timestamps, names, and blank cells are ignored, so a messy paste is fine. Codes collected any other way (a discussion board, an email, a typed list) work too.</p>
+  <section class="sheet-box" id="sheet-box" hidden>
+    <h2>Load from the class Google Sheet</h2>
+    <div id="connect">
+      <p class="small muted" style="margin-top:0">Enter the results key from <code>setResultsKey</code> in your Sheet’s Apps Script. The Sheet sends result codes only, never names.</p>
+      <label for="key" class="small muted">Results key</label>
+      <input type="text" id="key" autocomplete="off" spellcheck="false" style="max-width:26rem">
+      <div class="actions" style="margin-top:0.75rem">
+        <label class="small"><input type="checkbox" id="remember"> Remember the key on this device</label>
+        <button class="btn" id="connect-go">Load results</button>
+      </div>
+      <p class="err small" id="key-err" role="alert" hidden></p>
+    </div>
+    <div id="loaded" hidden>
+      <p class="small muted" style="margin-top:0" id="loaded-msg" role="status"></p>
+      <div class="filters">
+        <label>School year<select id="f-year"></select></label>
+        <label>Semester<select id="f-sem"></select></label>
+        <label>Section<select id="f-sec"></select></label>
+        <label class="check"><input type="checkbox" id="f-first"> First attempt on each device only</label>
+      </div>
+      <div class="actions" style="margin-top:1rem">
+        <button class="btn" id="sheet-show">Show class results</button>
+        <button class="btn quiet" id="sheet-reload">Refresh</button>
+        <button class="btn link" id="forget">Forget key</button>
+      </div>
+    </div>
+  </section>
+  <p id="paste-intro">Paste the column of result codes from your Google Forms response spreadsheet. Select the whole column in the linked Google Sheet, copy it, and paste it here. The header cell, timestamps, names, and blank cells are ignored, so a messy paste is fine. Codes collected any other way (a discussion board, an email, a typed list) work too.</p>
   <label for="paste" class="small muted">Result codes</label>
   <textarea id="paste" spellcheck="false" placeholder="V1-MEM-UND-SPK-NUM-BIM-LEG-TEMP-PSS"></textarea>
   <div class="actions">
@@ -84,6 +118,83 @@
 
   $("go").addEventListener("click", analyze);
   $("clear").addEventListener("click", () => { $("paste").value = ""; $("out").innerHTML = ""; $("status").textContent = ""; try { localStorage.removeItem(KEY); } catch (e) {} });
+  /* ---------- Google Sheet (optional, set sheetUrl in content.js) ---------- */
+  const SHEET_URL = String(C.settings.sheetUrl || "").trim();
+  const SHARING = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(SHEET_URL);
+  const KEY_STORE = C.settings.storageKey + ":results-key";
+  let sheetRows = null;
+  const ss = (kind) => { try { return window[kind]; } catch (e) { return null; } };
+  function getKey() { try { return (ss("sessionStorage") && sessionStorage.getItem(KEY_STORE)) || (ss("localStorage") && localStorage.getItem(KEY_STORE)); } catch (e) { return null; } }
+  function saveKey(k, remember) {
+    try { sessionStorage.setItem(KEY_STORE, k); } catch (e) {}
+    try { if (remember) localStorage.setItem(KEY_STORE, k); else localStorage.removeItem(KEY_STORE); } catch (e) {}
+  }
+  function forgetKey() {
+    try { sessionStorage.removeItem(KEY_STORE); } catch (e) {}
+    try { localStorage.removeItem(KEY_STORE); } catch (e) {}
+  }
+  function showConnect(msg) {
+    $("connect").hidden = false; $("loaded").hidden = true;
+    $("key-err").hidden = !msg; $("key-err").textContent = msg || "";
+  }
+  function loadSheet(key) {
+    $("key-err").hidden = true;
+    $("status").innerHTML = "<p>Loading results from the Google Sheet\u2026</p>";
+    fetch(SHEET_URL + "?view=results&key=" + encodeURIComponent(key) + "&t=" + Date.now())
+      .then((r) => r.json())
+      .then((d) => {
+        $("status").textContent = "";
+        if (!d || !d.ok) {
+          if (d && (d.error === "bad-key" || d.error === "no-key")) { forgetKey(); showConnect(d.message); return; }
+          throw new Error("unexpected");
+        }
+        sheetRows = d.rows || [];
+        $("connect").hidden = true; $("loaded").hidden = false;
+        fillFilters();
+        $("loaded-msg").textContent = `${sheetRows.length} result${sheetRows.length === 1 ? "" : "s"} in the Sheet. Choose what to include.`;
+        if (sheetRows.length) showSheet();
+      })
+      .catch(() => { $("status").textContent = ""; showConnect("Couldn\u2019t reach the Sheet. Check your connection and that Code.gs is deployed as a web app with access for Anyone, then try again."); });
+  }
+  function fillFilters() {
+    const opts = (id, vals, all) => {
+      const el = $(id), cur = el.value;
+      el.innerHTML = `<option value="">${all}</option>` + vals.map((v) => `<option>${esc(v)}</option>`).join("");
+      if (vals.includes(cur)) el.value = cur;
+    };
+    const uniq = (f) => [...new Set(sheetRows.map(f).filter(Boolean))];
+    const years = uniq((r) => r.year).sort().reverse();
+    const semKey = (s) => { const m = /(Fall|Spring) (\d+)/.exec(s); return m ? m[2] + (m[1] === "Fall" ? "2" : "1") : s; };
+    opts("f-year", years, "All years");
+    if (!$("f-year").value && years.length && !$("f-year").dataset.touched) $("f-year").value = years[0];
+    const yr = $("f-year").value;
+    opts("f-sem", [...new Set(sheetRows.filter((r) => !yr || r.year === yr).map((r) => r.semester).filter(Boolean))].sort((a, b) => semKey(b).localeCompare(semKey(a))), "All semesters");
+    opts("f-sec", uniq((r) => r.section).sort(), "All sections");
+  }
+  function showSheet() {
+    const y = $("f-year").value, sm = $("f-sem").value, sc = $("f-sec").value, first = $("f-first").checked;
+    const pick = sheetRows.filter((r) => (!y || r.year === y) && (!sm || r.semester === sm) && (!sc || r.section === sc) && (!first || !r.attempt || r.attempt === 1));
+    $("paste").value = "Result code\n" + pick.map((r) => r.code).join("\n");
+    analyze();
+  }
+  if (SHARING) {
+    $("sheet-box").hidden = false;
+    $("paste-intro").textContent = "Or paste result codes collected another way (a Google Form, a discussion board, an email). Header cells, names, and blank cells are ignored.";
+    $("connect-go").addEventListener("click", () => {
+      const k = $("key").value.trim();
+      if (!k) { showConnect("Enter the key first."); return; }
+      saveKey(k, $("remember").checked); loadSheet(k);
+    });
+    $("key").addEventListener("keydown", (e) => { if (e.key === "Enter") $("connect-go").click(); });
+    $("sheet-show").addEventListener("click", showSheet);
+    $("f-year").addEventListener("change", () => { $("f-year").dataset.touched = "1"; fillFilters(); showSheet(); });
+    ["f-sem", "f-sec", "f-first"].forEach((id) => $(id).addEventListener("change", showSheet));
+    $("sheet-reload").addEventListener("click", () => { const k = getKey(); if (k) loadSheet(k); else showConnect(); });
+    $("forget").addEventListener("click", () => { forgetKey(); sheetRows = null; $("key").value = ""; showConnect(); });
+    const k = getKey();
+    if (k) loadSheet(k);
+  }
+
   $("sample").addEventListener("click", () => { $("paste").value = "Result code\n" + sampleCodes(32).join("\n"); analyze(); });
 
   function analyze() {

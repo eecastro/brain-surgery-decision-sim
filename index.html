@@ -194,6 +194,11 @@
   }
   const STORE = C.settings.storageKey + ":" + C.version;
 
+  // Optional Google Sheet (see Code.gs and README). Empty sheetUrl = nothing is ever sent.
+  const SHEET_URL = String(C.settings.sheetUrl || "").trim();
+  const SHARING = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(SHEET_URL);
+  const SECTION = (params.get("section") || "").replace(/[^A-Za-z0-9 \-]/g, "").slice(0, 20);
+
   if (params.get("reset") === "1") {
     try { localStorage.removeItem(STORE); } catch (e) {}
     params.delete("reset");
@@ -209,7 +214,7 @@
       [order[i], order[j]] = [order[j], order[i]];
     }
     const flips = Array.from({ length: 80 }, () => secureRandom() < 0.5);
-    return { stage: "intro", order, flips, answers: [], ranking: null, corridor: null, roll: null, phase: "post" };
+    return { stage: "intro", order, flips, answers: [], ranking: null, corridor: null, roll: null, phase: "post", id: newId(), attempt: 1, sent: false };
   }
   let S = load() || freshState();
   function load() {
@@ -219,6 +224,10 @@
       const s = JSON.parse(raw);
       return s && s.stage && Array.isArray(s.order) ? s : null;
     } catch (e) { return null; }
+  }
+  function newId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return Array.from({ length: 24 }, () => "0123456789abcdef"[Math.floor(secureRandom() * 16)]).join("");
   }
   function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
   function go(stage) { S.stage = stage; save(); render(true); }
@@ -516,6 +525,8 @@
           <p class="small muted" style="margin:0">It records your top three and bottom three priorities, your route, and what happened. Submit it the way your instructor asks.</p>
           <div class="code" id="code">${esc(code)}</div>
           <div class="actions" style="margin-top:0.5rem"><button class="btn" data-act="copy">Copy code</button><span id="copied" class="small muted" role="status"></span></div>
+          ${SHARING ? `<p class="small" id="send-status" role="status" style="margin:0.75rem 0 0">${S.sent ? "Sent to your class results." : "Sending to your class results\u2026"}</p>
+          <p class="small muted" style="margin:0.25rem 0 0">${esc(C.sendingNote || "")}</p>` : ""}
         </section>
 
         <section>
@@ -540,6 +551,7 @@
         const t = app.querySelector(`[data-phase="${S.phase}"]`); if (t) t.focus({ preventScroll: true });
       }));
       document.getElementById("pname").addEventListener("input", (e) => { S.name = e.target.value.slice(0, 80); save(); });
+      sendResult(code);
     }
   };
 
@@ -586,6 +598,8 @@
       })
     };
     save(); // saved before anything is shown, so refreshing cannot re-roll
+    // Send right away, so the result reaches the class sheet even if the student never opens Recovery
+    sendResult(buildCode(S.ranking, corr.code, S.roll.results.map((r) => (r.hit ? (r.temp ? "T" : "P") : "S"))));
   }
 
   function animateNeedle(el, target, done) {
@@ -613,10 +627,40 @@
     window.print();
   }
 
+  /* ---------- Google Sheet (optional) ---------- */
+  // Sends the result code once per surgery. Only the code, section, attempt number and a random
+  // ID go out; the name typed for the PDF never leaves the device. Resending the same ID updates
+  // the same row, so a retry after a dropped connection cannot create a duplicate.
+  let sending = false, retryTimer = null;
+  function sendResult(code) {
+    if (!SHARING || S.sent || sending) return;
+    if (!S.id) { S.id = newId(); save(); }
+    sending = true;
+    const status = (t) => { const el = document.getElementById("send-status"); if (el) el.textContent = t; };
+    // text/plain + no-cors avoids a CORS preflight, which Apps Script can't answer
+    fetch(SHEET_URL, {
+      method: "POST",
+      mode: "no-cors",
+      keepalive: true,
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ code, section: SECTION, id: S.id, attempt: S.attempt || 1, v: C.version })
+    }).then(() => {
+      sending = false; S.sent = true; save();
+      status("Sent to your class results.");
+    }).catch(() => {
+      sending = false;
+      status("Couldn\u2019t reach the class results. It will try again; you can also copy your code.");
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => { if (S.stage === "reveal") sendResult(code); }, 15000);
+    });
+  }
+
   function startOver() {
     const ok = window.confirm("Start over? This erases your choices, your surgery result, and your result code on this device. If you need your result, save the PDF or copy the code first.");
     if (!ok) return;
+    const attempt = (S.attempt || 1) + (S.roll ? 1 : 0);
     S = freshState();
+    S.attempt = attempt;
     save();
     render(true);
   }
